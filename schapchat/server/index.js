@@ -15,6 +15,8 @@ const {client_id, project_id, auth_uri, token_uri, client_secret} = web;
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
+const {getComments} = require('./controllers/commentsController');
+
 const DB_CONNECTION_URL = `mongodb://${dbUser}:${dbPassword}${dbUrl}`;
 
 mongoose.connect(DB_CONNECTION_URL, (err) => {
@@ -36,7 +38,7 @@ app.use(function(req, res, next) {
  next();
 });
 
-app.use(Session({ secret: 'keyboard cat' }));
+app.use(Session({ secret: 'the skeets' }));
 app.use(passport.initialize());
 
 passport.use(new GoogleStrategy({
@@ -45,9 +47,8 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:3001/api/auth/google/callback"
   },
   function(accessToken, refreshToken, profile, done) {
-       console.log('loc1 ', accessToken)
-       console.log('loc2 ', refreshToken)
-       console.log('loc3 ', profile);
+       profile.accessToken = accessToken;
+       profile.refreshToken = refreshToken;
        return done(null, profile);
   }
 ));
@@ -61,13 +62,13 @@ passport.deserializeUser(function(user, done) {
 });
 
 router.get('/', function(req, res) {
-  console.log('success')
  res.json({ message: 'API Initialized!'});
 });
 
-router.get('/login', function(req, res) {
-  console.log('fail');
-  res.json({ message: 'Failure! '});
+router.get('/comments', getComments);
+
+router.post('/comments/:comment', function(req, res) {
+
 });
 
 router.get('/auth/google',
