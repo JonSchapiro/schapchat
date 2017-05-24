@@ -12,8 +12,10 @@ class App extends Component {
    }
 
    componentWillMount() {
-    const path = window.location.pathname;
-    this.setState({path});
+    const path = window.location ? window.location.pathname : '';
+    if (path) {
+      this.setState({path});
+    }
    }
 
    render() {
@@ -24,9 +26,7 @@ class App extends Component {
      }
 
      if (this.state.path === '/error') {
-      return (
-        <Error/>
-       )
+      return (<Error/>)
      }
 
      return (

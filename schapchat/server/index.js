@@ -15,7 +15,7 @@ const {client_id, project_id, auth_uri, token_uri, client_secret} = web;
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
-const {getComments} = require('./controllers/commentsController');
+const {getComments, createComment} = require('./controllers/commentsController');
 
 const DB_CONNECTION_URL = `mongodb://${dbUser}:${dbPassword}${dbUrl}`;
 
@@ -67,9 +67,7 @@ router.get('/', function(req, res) {
 
 router.get('/comments', getComments);
 
-router.post('/comments/:comment', function(req, res) {
-
-});
+router.post('/comments/comment', createComment);
 
 router.get('/auth/google',
   passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/youtube'] }));
