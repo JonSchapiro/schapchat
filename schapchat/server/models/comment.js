@@ -5,7 +5,7 @@ var CommentSchema = new Schema({
   author: String,
   text: String,
   likeCount: Number,
-  authorId: Number,
+  authorId: String,
   date: Date
 });
 
