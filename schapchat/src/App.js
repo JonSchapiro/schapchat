@@ -1,5 +1,7 @@
 import React, { Component } from 'react';
 import Success from './components/Success';
+import Error from './components/Error';
+import Login from './components/Login';
 
 // Application Skeleton Component
 class App extends Component {
@@ -17,24 +19,18 @@ class App extends Component {
    render() {
      if (this.state.path === '/success') {
       return (
-        <div>
-          Success
-        </div>
+        <Success/>
        )
      }
 
      if (this.state.path === '/error') {
       return (
-        <div>
-          Error
-        </div>
+        <Error/>
        )
      }
 
      return (
-      <div>
-        <a href="http://localhost:3001/api/auth/google">Sign In with Google</a>
-      </div>
+      <Login/>
      )
    }
 }
