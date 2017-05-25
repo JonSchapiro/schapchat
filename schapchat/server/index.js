@@ -15,6 +15,8 @@ const {client_id, project_id, auth_uri, token_uri, client_secret} = web;
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
+const User = require('./models/user');
+
 const {
   getComments,
   createComment,
@@ -25,6 +27,8 @@ const {
   removeAllComments
 } = require('./controllers/commentsController');
 
+const {retrieveUsers, deleteUsers} = require('./controllers/userController');
+
 const DB_CONNECTION_URL = `mongodb://${dbUser}:${dbPassword}${dbUrl}`;
 
 mongoose.connect(DB_CONNECTION_URL, (err) => {
@@ -34,6 +38,7 @@ mongoose.connect(DB_CONNECTION_URL, (err) => {
 	return console.log('Succesfully connected to database');
 });
 
+app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
@@ -46,8 +51,27 @@ app.use(function(req, res, next) {
  next();
 });
 
+app.use(function(req, res, next) {
+  console.log(req.originalUrl);
+  next();
+});
+
 app.use(Session({ secret: 'the skeets' }));
 app.use(passport.initialize());
+app.use(passport.session());
+
+// used to serialize the user for the session
+passport.serializeUser(function(user, done) {
+    done(null, user.id);
+});
+
+// used to deserialize the user
+passport.deserializeUser(function(id, done) {
+    User.findById(id, function(err, user) {
+        done(err, user);
+    });
+});
+
 
 passport.use(new GoogleStrategy({
     clientID: client_id,
@@ -55,20 +79,38 @@ passport.use(new GoogleStrategy({
     callbackURL: "http://localhost:3001/api/auth/google/callback"
   },
   function(accessToken, refreshToken, profile, done) {
-       profile.accessToken = accessToken;
-       profile.refreshToken = refreshToken;
-       return done(null, profile);
+    // User.findOne won't fire until we have all our data back from Google
+    process.nextTick(function() {
+        // try to find the user based on their google id
+        User.findOne({ 'googleId' : profile.id }, function(err, user) {
+            if (err)
+                return done(err);
+
+            if (user) {
+
+                // if a user is found, log them in
+                return done(null, user);
+            } else {
+                // if the user isnt in our database, create a new user
+                var newUser          = new User();
+
+                // set all of the relevant information
+                newUser.googleId    = profile.id;
+                newUser.googleToken = accessToken;
+                newUser.googleName  = profile.displayName;
+                newUser.googleEmail = profile.emails && profile.emails.length ? profile.emails[0].value : undefined; // pull the first email
+
+                // save the user
+                newUser.save(function(err) {
+                    if (err)
+                        throw err;
+                    return done(null, newUser);
+                });
+            }
+        });
+    });
   }
 ));
-
-passport.serializeUser(function(user, done) {
-  console.log('loc2 ', user);
-  done(null, user);
-});
-
-passport.deserializeUser(function(user, done) {
-  done(null, user);
-});
 
 router.get('/', function(req, res) {
  res.json({ message: 'API Initialized!'});
@@ -76,9 +118,8 @@ router.get('/', function(req, res) {
 
 
 // <!----------- API ROUTES ------------>
-
 // comments
-router.get('/comments', getComments);
+router.get('/comments', isLoggedIn, getComments);
 router.post('/comments/comment', createComment);
 router.delete('/comments/:commentId', deleteComment);
 router.delete('/comments', removeAllComments);
@@ -88,20 +129,45 @@ router.post('/likes/:commentId', likeComment);
 router.get('/likes', getLikes);
 router.delete('/likes', removeAllLikes);
 
+// users
+router.get('/users', retrieveUsers);
+router.delete('/users', deleteUsers);
+
 // auth
 router.get('/auth/google',
   passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/youtube'] }));
 
 router.get('/auth/google/callback', 
   passport.authenticate('google', {
-    successRedirect: 'http://localhost:3000/success',
+    successRedirect: 'http://localhost:3001/schapchat',
     failureRedirect: 'http://localhost:3000/error'
   }));
 
+router.get('/logout', function(req, res) {
+  req.logout();
+  res.redirect('/api');
+});
 
 app.use('/api', router);
 
-// <!----------- API ROUTES ------------>
+// <!--------View Routes --->
+app.get('/schapchat', isLoggedIn, function(req, res) {
+  res.render('schapchat.ejs', {
+      user : req.user // get the user out of session and pass to template
+  });
+});
+
+// route middleware to make sure a user is logged in
+function isLoggedIn(req, res, next) {
+  // if user is authenticated in the session, carry on
+  if (req.isAuthenticated()){
+    console.log('user is authenticated')
+    return next();
+  }
+
+  // if they aren't redirect them to the home page
+  res.redirect('/api');
+}
 
 app.listen(port, function() {
  console.log(`Prankin' on ${port}`);
