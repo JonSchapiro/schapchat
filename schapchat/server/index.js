@@ -15,7 +15,15 @@ const {client_id, project_id, auth_uri, token_uri, client_secret} = web;
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
-const {getComments, createComment, likeComment, getLikes} = require('./controllers/commentsController');
+const {
+  getComments,
+  createComment,
+  likeComment,
+  getLikes,
+  deleteComment,
+  removeAllLikes,
+  removeAllComments
+} = require('./controllers/commentsController');
 
 const DB_CONNECTION_URL = `mongodb://${dbUser}:${dbPassword}${dbUrl}`;
 
@@ -54,6 +62,7 @@ passport.use(new GoogleStrategy({
 ));
 
 passport.serializeUser(function(user, done) {
+  console.log('loc2 ', user);
   done(null, user);
 });
 
@@ -65,20 +74,25 @@ router.get('/', function(req, res) {
  res.json({ message: 'API Initialized!'});
 });
 
+
+// <!----------- API ROUTES ------------>
+
 // comments
 router.get('/comments', getComments);
-
 router.post('/comments/comment', createComment);
+router.delete('/comments/:commentId', deleteComment);
+router.delete('/comments', removeAllComments);
 
 // likes
 router.post('/likes/:commentId', likeComment);
 router.get('/likes', getLikes);
+router.delete('/likes', removeAllLikes);
 
 // auth
 router.get('/auth/google',
   passport.authenticate('google', { scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/youtube'] }));
 
-router.get('/auth/google/callback',
+router.get('/auth/google/callback', 
   passport.authenticate('google', {
     successRedirect: 'http://localhost:3000/success',
     failureRedirect: 'http://localhost:3000/error'
@@ -86,6 +100,8 @@ router.get('/auth/google/callback',
 
 
 app.use('/api', router);
+
+// <!----------- API ROUTES ------------>
 
 app.listen(port, function() {
  console.log(`Prankin' on ${port}`);

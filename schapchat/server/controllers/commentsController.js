@@ -13,16 +13,91 @@ function emptyComment(author, text, authorId) {
   };
 }
 
+function removeAllComments(req, res) {
+  Comment.remove({}, function(err, resp) {
+    if (err) {
+      res.status(500);
+      return res.json({Error: 'Could not remove all comments'});
+    }
+
+    res.status(200);
+    res.json({Success: 'All comments removed'});
+  });
+}
+
+function removeAllLikes(req, res) {
+  Like.remove({}, function(err, resp) {
+    if (err) {
+      res.status(500);
+      return res.json({Error: 'Could not remove all likes'});
+    }
+
+    res.status(200);
+    res.json({Success: 'All likes removed'});
+  });
+}
+
+// delete a comment
+function deleteComment(req, res) {
+  const commentId = req.params.commentId;
+  const authorId = '1'; // req.session.authorId;
+  const errorMessage = '';
+
+  if (!authorId) {
+    errorMessage = 'Unable to identify user';
+  }
+
+  if (!commentId) {
+    errorMessage = 'Unable to identify comment';
+  }
+
+  if (errorMessage) {
+    res.status(400);
+    return res.json({Error: 'Not enough information to delete comment'});
+  }
+
+  // Refactor - should all be done in one query
+  Comment.findById(commentId)
+    .exec(function(err, commentResp) {
+      if (err) {
+        res.status(500);
+        return res.json({Error: 'Something went wrong in finding the comment'});
+      }
+
+      if (!commentResp || commentResp.authorId !== authorId) {
+        res.status(400);
+        return res.json({Error: 'User is not owner of this comment'});
+      }
+
+      Comment.remove({_id: commentId}, function(err) {
+        if (err) {
+          res.status(500);
+          return res.json({Error: 'Unable to remove comment'});
+        }
+
+        Like.remove({commentId: commentId}, function(err, likeResp) {
+          if (err) {
+            res.status(500);
+            return res.json({Error: 'Unable to remove like'});
+          }
+
+          res.status(200)
+          return res.json(commentResp);
+        });
+      });
+    });
+}
+
 // like a comment
 function likeComment(req, res) {
-  const commentId = '5925ae52986434a162d1ef61'; // req.body.commentId;
+  const commentId = req.params.commentId; // req.body.commentId;
   const userId = '1'; // req.session.userId;
   if (!commentId || !userId) {
     res.status(500);
     return res.json({Error: 'Unable to like comment'});
   }
 
-  // check if like exists
+  // check if like exists 
   Like.find({userId: userId})
     .where('commentId').equals(commentId)
     .exec(function(err, likeResp) {
@@ -46,6 +121,7 @@ function likeComment(req, res) {
           // refactor - http://mongoosejs.com/docs/api.html#model_Model.update
           Comment.findById(commentId, function(err, comment) {
             if (err || !comment) {
+              like.remove();
               res.status(500);
               return res.json({Error: 'Unable to find comment'});
             }
@@ -98,7 +174,7 @@ function likeComment(req, res) {
 }
 
 
-// grab all likes
+// grab all likes 
 function getLikes(req, res) {
   Like.find({}, function(err, likes) {
     if (err) {
@@ -111,7 +187,7 @@ function getLikes(req, res) {
   });
 }
 
-// grab all comments
+// grab all comments 
 function getComments(req, res) {
   Comment.find({}, function(err, comments) {
     if (err) {
@@ -126,11 +202,9 @@ function getComments(req, res) {
 
 // create new comment
 function createComment(req, res) {
-  // grab username and id from session details
-  // find or create comment with text from req
   const authorId = '1';
   const author = 'Jonathan Schapiro';
-  const text = 'new comment';//'new comment';
+  const text = req.body.text;
 
   if (!authorId || !author || !text) {
     res.status(400);
@@ -155,5 +229,8 @@ module.exports =  {
 	getComments,
   createComment,
   likeComment,
-  getLikes
+  getLikes,
+  deleteComment,
+  removeAllLikes,
+  removeAllComments
 }
