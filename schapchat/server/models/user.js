@@ -7,7 +7,8 @@ var UserSchema = new Schema({
   googleId: String,
   googleToken: String,
   googleName: String,
-  googleEmail: String
+  googleEmail: String,
+  isSubscribed: Boolean
 });
 
 module.exports = mongoose.model('User', UserSchema);

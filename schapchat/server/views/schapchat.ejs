@@ -1,8 +1,25 @@
 <html>
 	<head>
+		<script src="https://apis.google.com/js/platform.js"></script>
+
+		<script>
+		  function onYtEvent(payload) {
+		    if (payload.eventType == 'subscribe') {
+		      // Add code to handle subscribe event.
+		      console.log('subbed')
+		    } else if (payload.eventType == 'unsubscribe') {
+		      // Add code to handle unsubscribe event.
+		      console.log('unsubbed')
+		    }
+		    if (window.console) { // for debugging only
+		      window.console.log('YT event: ', payload);
+		    }
+		  }
+		</script>
 	</head>
 	<body>
 		<div> Hello world </div>
 		<div> <%= user %></div>
+		<div class="g-ytsubscribe" data-channelid="UCJv5T2W-D3K3fYO0prgv5uw" data-layout="default" data-count="default" data-onytevent="onYtEvent"></div>
 	</body>
 </html>
