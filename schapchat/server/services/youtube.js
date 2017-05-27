@@ -48,12 +48,31 @@ function subscribe(token, cb) {
     }
   }, function(err, resp) {
     if (err || !resp) {
-      return cb(err, null);
+      // returning response as there might be an error object in the resp
+      return cb(err, resp);
     }
 
     return cb(null, res.body);
   });
 }
+
+/*
+  {
+    "error": {
+      "errors": [
+        {
+          "domain": "global",
+          "reason": "required",
+          "message": "Login Required",
+          "locationType": "header",
+          "location": "Authorization"
+        }
+      ],
+      "code": 401,
+      "message": "Login Required"
+    }
+  }
+*/
 
 module.exports = {
   isSubscribed,

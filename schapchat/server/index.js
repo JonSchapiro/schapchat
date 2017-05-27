@@ -42,6 +42,7 @@ mongoose.connect(DB_CONNECTION_URL, (err) => {
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use(express.static('public'));
 
 app.use(function(req, res, next) {
  res.setHeader('Access-Control-Allow-Origin', '*');
@@ -102,7 +103,7 @@ passport.use(new GoogleStrategy({
               newUser.googleId    = profile.id;
               newUser.googleToken = accessToken;
               newUser.googleName  = profile.displayName;
-              newUser.googleEmail = profile.emails && profile.emails.length ? profile.emails[0].value : undefined; // pull the first email
+              newUser.googleEmail = profile.emails && profile.emails.length ? profile.emails[0].value : ''; // pull the first email
 
               authedUser = newUser;
             }
@@ -129,7 +130,7 @@ router.get('/', function(req, res) {
 
 // <!----------- API ROUTES ------------>
 // comments
-router.get('/comments', isLoggedIn, getComments);
+router.get('/comments', getComments);
 router.post('/comments/comment', createComment);
 router.delete('/comments/:commentId', deleteComment);
 router.delete('/comments', removeAllComments);
@@ -162,6 +163,8 @@ app.use('/api', router);
 
 // <!--------View Routes --->
 app.get('/schapchat', isLoggedIn, userSubscribed, function(req, res) {
+
+  getComments();
   res.render('schapchat.ejs', {
       user : req.user // get the user out of session and pass to template
   });

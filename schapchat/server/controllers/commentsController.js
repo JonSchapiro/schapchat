@@ -2,19 +2,28 @@ const _ = require('lodash');
 const mongoose = require('mongoose');
 const Comment = require('../models/comment');
 const Like = require('../models/like');
+const {
+  removeComments,
+  findCommentWithAuthor,
+  removeComment,
+  getAllComments,
+  saveComment,
+  findComment
+} = require('../services/db/comments');
 
 function emptyComment(author, text, authorId) {
   return {
     author: author,
     text: text,
     likeCount: 0,
+    likes: [],
     authorId: authorId,
     date: new Date()
   };
 }
 
 function removeAllComments(req, res) {
-  Comment.remove({}, function(err, resp) {
+  removeComments(function(err, resp) {
     if (err) {
       res.status(500);
       return res.json({Error: 'Could not remove all comments'});
@@ -57,122 +66,65 @@ function deleteComment(req, res) {
   }
 
   // Refactor - should all be done in one query
-  Comment.findById(commentId)
-    .exec(function(err, commentResp) {
+  findCommentWithAuthor(commentId, authorId, function(err, commentResp) {
       if (err) {
         res.status(500);
-        return res.json({Error: 'Something went wrong in finding the comment'});
+        return res.json(err);
       }
 
-      if (!commentResp || commentResp.authorId !== authorId) {
+      if (!commentResp) {
         res.status(400);
-        return res.json({Error: 'User is not owner of this comment'});
+        return res.json(err);
       }
 
-      Comment.remove({_id: commentId}, function(err) {
+      removeComment(commentId, function(err) {
         if (err) {
           res.status(500);
-          return res.json({Error: 'Unable to remove comment'});
+          return res.json(err);
         }
 
-        Like.remove({commentId: commentId}, function(err, likeResp) {
-          if (err) {
-            res.status(500);
-            return res.json({Error: 'Unable to remove like'});
-          }
-
-          res.status(200)
-          return res.json(commentResp);
-        });
+        res.status(200);
+        return res.json(commentResp);
       });
     });
 }
 
-// like a comment
 function likeComment(req, res) {
-  const commentId = req.params.commentId; // req.body.commentId;
-  const userId = '1'; // req.session.userId;
+  const commentId = req.params.commentId;
+  const userId = '1';//req.user ? req.user.googleId : '';
   if (!commentId || !userId) {
     res.status(500);
-    return res.json({Error: 'Unable to like comment'});
+    return res.json({Error: 'Unable to like comment, must providea commentId and userId'});
   }
 
-  // check if like exists 
-  Like.find({userId: userId})
-    .where('commentId').equals(commentId)
-    .exec(function(err, likeResp) {
+  findComment(commentId, function(err, comment) {
+    if (err || !comment) {
+      res.status(500);
+      return res.json(err);
+    }
+
+    const deltaLike = comment.likes ? comment.likes.indexOf(userId) : -1;
+
+    // like already exists
+    if (deltaLike > -1) {
+      comment.likes.splice(deltaLike, 1);
+      comment.likeCount = comment.likeCount - 1;
+    } else { // like doesn't exist yet
+      comment.likes.push(userId);
+      comment.likeCount = comment.likeCount + 1;
+    }
+
+    saveComment(comment, function(err) {
       if (err) {
         res.status(500);
-        return res.json({Error: 'Unable to lookup like'});
+        return res.json(err);
       }
 
-      // if like not found found - create like and increment comment count
-      if (!likeResp || likeResp && !likeResp.length) {
-        const like = new Like();
-        like.userId = userId;
-        like.commentId = commentId;
-        like.save(function(err) {
-          if (err) {
-            res.status(500);
-            return res.json({Error: 'Unable to save like'});
-          }
-
-
-          // refactor - http://mongoosejs.com/docs/api.html#model_Model.update
-          Comment.findById(commentId, function(err, comment) {
-            if (err || !comment) {
-              like.remove();
-              res.status(500);
-              return res.json({Error: 'Unable to find comment'});
-            }
-
-            comment.likeCount = comment.likeCount + 1;
-
-            comment.save(function(err) {
-              if (err) {
-                res.status(500);
-                return res.json({Error: 'Unable to update likeCount'});
-              }
-
-              res.status(200);
-              res.json({LikesCount: comment.likeCount});
-            });
-          });
-        });
-
-        return;
-      }
-
-      // refactor - http://mongoosejs.com/docs/api.html#model_Model.update
-      // decrement comment like count and delete like
-      Comment.findById(commentId, function(err, comment) {
-        if (err || !comment) {
-          res.status(500);
-          return res.json({Error: 'Unable to find comment'});
-        }
-
-        comment.likeCount = comment.likeCount - 1;
-
-        comment.save(function(err) {
-          if (err) {
-            res.status(500);
-            return res.json({Error: 'Unable to update likeCount'});
-          }
-
-          Like.remove({userId: userId, commentId: commentId}, function(err) {
-            if (err) {
-              res.status(500);
-              return res.json({Error: 'Unable to delete like'});
-            }
-          });
-
-          res.status(200);
-          res.json({LikesCount: comment.likeCount});
-        });
-      });
+      res.status(200);
+      res.json({LikesCount: comment.likeCount});
     });
+  });
 }
-
 
 // grab all likes 
 function getLikes(req, res) {
@@ -189,14 +141,14 @@ function getLikes(req, res) {
 
 // grab all comments 
 function getComments(req, res) {
-  Comment.find({}, function(err, comments) {
+  getAllComments(function(err, comments) {
     if (err) {
       res.status(500);
-      return res.json({Error: 'Error retreiving comments'});
+      return res.json(err);
     }
 
     res.status(200);
-    res.json({comments: comments});
+    res.json(comments);
   });
 }
 
@@ -214,10 +166,10 @@ function createComment(req, res) {
   const comment = new Comment();
   _.extend(comment, emptyComment(author, text, authorId));
 
-  comment.save(function(err) {
+  saveComment(comment, function(err) {
     if (err) {
       res.status(500);
-      return res.json({Error: 'Unable to save comment'});
+      return res.json(err);
     }
 
     res.status(200);

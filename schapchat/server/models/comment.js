@@ -8,7 +8,8 @@ var CommentSchema = new Schema({
   text: String,
   likeCount: Number,
   authorId: String,
-  date: Date
+  date: Date,
+  likes: [String]
 });
 
 module.exports = mongoose.model('Comment', CommentSchema);
