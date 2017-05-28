@@ -67,12 +67,13 @@ function findComment(commentId, cb) {
 }
 
 function getAllComments(cb) {
-  Comment.find({}, function(err, comments) {
-    if (err) {
-      return cb({Error: 'Error retreiving comments'});
-    }
+  Comment.find({}).sort([['likeCount', 'descending']])
+    .exec(function(err, comments) {
+      if (err) {
+        return cb({Error: 'Error retreiving comments'});
+      }
 
-    cb(null, {comments: comments});
+      cb(null, {comments: comments});
   });
 }
 

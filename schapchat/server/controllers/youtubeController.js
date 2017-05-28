@@ -23,6 +23,10 @@ function userSubscribed(req, res, next) {
   });
 }
 
+function subscribeToSchapchat(req, res, next) {
+
+}
+
 module.exports = {
   userSubscribed
 };

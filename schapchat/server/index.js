@@ -16,19 +16,13 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
 
 const User = require('./models/user');
-const {isSubscribed} = require('./services/youtube');
+const {isSubscribed, renewAccessToken} = require('./services/youtube');
 
-const {
-  getComments,
-  createComment,
-  likeComment,
-  getLikes,
-  deleteComment,
-  removeAllLikes,
-  removeAllComments
-} = require('./controllers/commentsController');
+const commentsRoutes = require('./middleware/routes/commentRoutes');
+const userRoutes = require('./middleware/routes/userRoutes');
 
-const {retrieveUsers, deleteUsers} = require('./controllers/userController');
+const {authenticateUser} = require('./controllers/authController');
+const {getComments} = require('./controllers/commentsController');
 
 const DB_CONNECTION_URL = `mongodb://${dbUser}:${dbPassword}${dbUrl}`;
 
@@ -36,13 +30,14 @@ mongoose.connect(DB_CONNECTION_URL, (err) => {
 	if (err) {
 		return console.error(new Error('A problem occured while connecting to database!'));
 	}
+
 	return console.log('Succesfully connected to database');
 });
 
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static(__dirname + '/public'));
 
 app.use(function(req, res, next) {
  res.setHeader('Access-Control-Allow-Origin', '*');
@@ -74,53 +69,13 @@ passport.deserializeUser(function(id, done) {
     });
 });
 
-
 passport.use(new GoogleStrategy({
     clientID: client_id,
     clientSecret: client_secret,
     callbackURL: "http://localhost:3001/api/auth/google/callback",
   },
   function(accessToken, refreshToken, profile, done) {
-    // User.findOne won't fire until we have all our data back from Google
-    process.nextTick(function() {
-        // try to find the user based on their google id
-        User.findOne({ 'googleId' : profile.id }, function(err, user) {
-            if (err){
-              return done(err);
-            }
-
-            let authedUser;
-
-            if (user) {
-              // if a user is found, log them in
-              authedUser = user;
-
-            } else {
-              // if the user isnt in our database, create a new user
-              var newUser = new User();
-
-              // set all of the relevant information
-              newUser.googleId    = profile.id;
-              newUser.googleToken = accessToken;
-              newUser.googleName  = profile.displayName;
-              newUser.googleEmail = profile.emails && profile.emails.length ? profile.emails[0].value : ''; // pull the first email
-
-              authedUser = newUser;
-            }
-
-            const token = authedUser ? authedUser.googleToken : '';
-
-            isSubscribed(token, function(err, isSubbed) {
-              authedUser.isSubscribed = isSubbed || false;
-              authedUser.save(function(err, success) {
-                if (err || !success) {
-                  console.error('Unable to save user after isSubbed');
-                }
-                return done(null, authedUser);
-              });
-            });
-        });
-    });
+    authenticateUser(accessToken, refreshToken, profile, done);
   }
 ));
 
@@ -129,24 +84,15 @@ router.get('/', function(req, res) {
 });
 
 // <!----------- API ROUTES ------------>
-// comments
-router.get('/comments', getComments);
-router.post('/comments/comment', createComment);
-router.delete('/comments/:commentId', deleteComment);
-router.delete('/comments', removeAllComments);
-
-// likes
-router.post('/likes/:commentId', likeComment);
-router.get('/likes', getLikes);
-router.delete('/likes', removeAllLikes);
+// comments/likes
+commentsRoutes(router);
 
 // users
-router.get('/users', retrieveUsers);
-router.delete('/users', deleteUsers);
+userRoutes(router);
 
 // auth
 router.get('/auth/google',
-  passport.authenticate('google', { access_type: 'offline', approval_prompt: 'force', scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/userinfo.profile'] }));
+  passport.authenticate('google', { accessType: 'offline', approvalPrompt: 'force', scope: ['https://www.googleapis.com/auth/plus.login', 'https://www.googleapis.com/auth/youtube', 'https://www.googleapis.com/auth/userinfo.profile'] }));
 
 router.get('/auth/google/callback', 
   passport.authenticate('google', {
@@ -161,12 +107,17 @@ router.get('/logout', function(req, res) {
 
 app.use('/api', router);
 
-// <!--------View Routes --->
+// <!--------View Routes ---> 
 app.get('/schapchat', isLoggedIn, userSubscribed, function(req, res) {
+  getComments(null, null, function(err, comments) {
+    if (err) {
+      console.error('Error while retrieving comments: ', err);
+    }
 
-  getComments();
-  res.render('schapchat.ejs', {
-      user : req.user // get the user out of session and pass to template
+    res.render('schapchat.ejs', {
+        user : req.user, // get the user out of session and pass to template
+        comments: comments
+    });
   });
 });
 
@@ -184,7 +135,6 @@ app.get('/login', function(req, res) {
 function isLoggedIn(req, res, next) {
   // if user is authenticated in the session, carry on
   if (req.isAuthenticated()){
-    console.log('user is authenticated', req.user)
     return next();
   }
 
@@ -195,9 +145,9 @@ function isLoggedIn(req, res, next) {
 function userSubscribed(req, res, next) {
   console.log('current user ', req.user);
   if (req.user && req.user.isSubscribed) {
-    next();
+    return next();
   }
-
+  
   res.redirect('/subscribe');
 }
 

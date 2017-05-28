@@ -49,7 +49,7 @@ function removeAllLikes(req, res) {
 // delete a comment
 function deleteComment(req, res) {
   const commentId = req.params.commentId;
-  const authorId = '1'; // req.session.authorId;
+  const authorId = "1"//req.user ? req.user.googleId : '';
   const errorMessage = '';
 
   if (!authorId) {
@@ -113,7 +113,7 @@ function likeComment(req, res) {
       comment.likes.push(userId);
       comment.likeCount = comment.likeCount + 1;
     }
-
+    
     saveComment(comment, function(err) {
       if (err) {
         res.status(500);
@@ -140,22 +140,26 @@ function getLikes(req, res) {
 }
 
 // grab all comments 
-function getComments(req, res) {
+function getComments(req, res, cb) {
   getAllComments(function(err, comments) {
-    if (err) {
-      res.status(500);
-      return res.json(err);
+    if (req && res) {
+      if (err) {
+        res.status(500);
+        return res.json(err);
+      }
+
+      res.status(200);
+      return res.json(comments);
     }
 
-    res.status(200);
-    res.json(comments);
+    cb(err, comments);
   });
 }
 
 // create new comment
 function createComment(req, res) {
-  const authorId = '1';
-  const author = 'Jonathan Schapiro';
+  const authorId = '1';//req.user ? req.user.googleId : '';
+  const author = 'Jonathan Schapiro' //req.user ? req.user.googleName : '';
   const text = req.body.text;
 
   if (!authorId || !author || !text) {

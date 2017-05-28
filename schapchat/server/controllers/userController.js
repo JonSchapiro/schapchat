@@ -3,8 +3,6 @@ const mongoose = require('mongoose');
 const User = require('../models/user');
 
 function retrieveUsers(req, res) {
-  console.log('user ', req);
-
   User.find({}, function(err, users) {
     if (err) {
       res.status(500);

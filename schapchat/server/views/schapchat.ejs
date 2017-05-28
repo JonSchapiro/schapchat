@@ -1,7 +1,8 @@
 <html>
 	<head>
 		<script src="https://apis.google.com/js/platform.js"></script>
-
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script src="/js/commentsClient.js"></script>
 		<script>
 		  function onYtEvent(payload) {
 		    if (payload.eventType == 'subscribe') {
@@ -19,7 +20,24 @@
 	</head>
 	<body>
 		<div> Hello world </div>
-		<div> <%= user %></div>
+		<div> is subbed </div>
+		<div> <%= user.isSubscribed %></div>
+		<div> <%= comments.comments %> </div>
+
+		<h1>comments </h1>
+		<div id="comments">
+		    <% for(var i=0; i<comments.comments.length; i++) { %>
+		        <div class="comment" data-comment-id=<%= comments.comments[i]._id%>>
+		        	<div class="comment-author"><%=comments.comments[i].author %></div>
+		        	<div class="comment-text"><%=comments.comments[i].text %></div>
+		        	<div class="comment-like-count"><%=comments.comments[i].likes.length %></div>
+		        	<div onClick="likeComment.call(this)" data-like-status="0">Like Comment</div>
+		        </div>
+		    <% } %>
+		</div>
+
 		<div class="g-ytsubscribe" data-channelid="UCJv5T2W-D3K3fYO0prgv5uw" data-layout="default" data-count="default" data-onytevent="onYtEvent"></div>
 	</body>
 </html>
+
+
